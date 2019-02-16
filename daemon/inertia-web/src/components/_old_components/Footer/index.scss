@@ -1,0 +1,27 @@
+@import "../../../styles/index";
+
+.footer {
+  height: $navbar;
+
+  .icons {
+    font-size: 20px;
+    object-fit: contain;
+
+    * {
+      display: inline-block;
+    }
+
+    > a {
+      color: $lightblue;
+    }
+  }
+
+  .launchpad {
+    fill: $lightblue;
+    width: 105px;
+  }
+
+  .daemon-version {
+    color: $lightblue;
+  }
+}

@@ -1,0 +1,25 @@
+@import "animations";
+@import "colours";
+@import "decorations";
+@import "spacing";
+@import "typography";
+@import "utils";
+
+* {
+    border: 0;
+    box-sizing: border-box;
+    font: inherit;
+    margin: 0;
+    padding: 0;
+    vertical-align: baseline;
+}
+body {
+    background: $background;
+    font-family: Rubik, sans-serif;
+    height: 100%;
+    width: 100%;
+}
+html {
+    height: 100vh;
+    width: 100vw;
+}

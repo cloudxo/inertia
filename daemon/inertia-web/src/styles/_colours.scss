@@ -1,0 +1,33 @@
+// whites
+$white: #FFF;
+$background: #F9F9F9;
+
+// greys
+$grey: #474D5E;
+$greyblue: #666C7B;
+$darkgrey: #212B36;
+
+// blues
+$lightblue: #D3FAFB;
+
+// highlights
+$highlight-light: #E5F0FC;
+$highlight-blue: #BBECF9;
+$highlight-teal: #5AC4BA;
+$highlight-darkteal: #00A09F;
+
+// reds
+$lightred: #F76C6C;
+
+// classes
+$separator: rgba(151, 151, 151, 0.14);
+$shadow: rgba(155, 155, 155, 0.14);
+
+// gradients
+$gradient-active-start: #BCF8AB;
+$gradient-active-end: #DCFFEB;
+$gradient-active: linear-gradient(257deg, $gradient-active-start, $gradient-active-end);
+
+$gradient-inactive-start: #E4E4E4;
+$gradient-inactive-end: #CACACA;
+$gradient-inactive: linear-gradient(257deg, $gradient-inactive-start, $gradient-inactive-end);

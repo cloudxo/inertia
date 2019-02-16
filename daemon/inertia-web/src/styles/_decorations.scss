@@ -1,0 +1,74 @@
+.bg {
+    &-white {
+        background: $white;
+    }
+
+    &-highlight-light {
+        background: $highlight-light;
+    }
+
+    &-terminal {
+        background: $darkgrey;
+        color: $white;
+    }
+}
+.border {
+    &-end {
+        border-bottom: 1px solid $separator;
+    }
+}
+.clickable {
+    &:hover {
+        cursor: pointer;
+    }
+}
+.color { // Fonts
+    &-white {
+        color: $white;
+    }
+
+    &-grey {
+        color: $grey;
+    }
+}
+.hover {
+    &-bg {
+        &-highlight-light {
+            &:hover {
+                background-color: $highlight-light !important;
+            }
+        }
+    }
+
+    &-color {
+        &-lightred {
+            &:hover {
+                color: $lightred !important;
+            }
+
+            &-all {
+                &:hover {
+                    color: $lightred !important;
+
+                    > * {
+                        color: $lightred !important;
+                    }
+                }
+            }
+        }
+    }
+
+    &-fill {
+        &-lightred {
+            &:hover {
+                fill: $lightred !important;
+            }
+        }
+    }
+}
+.rounded {
+    border-radius: 2px;
+}
+.shadow {
+    box-shadow: 0 2px 4px 0 $shadow;
+}
