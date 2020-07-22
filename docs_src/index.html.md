@@ -23,6 +23,8 @@ search: false
 [![](https://img.shields.io/docker/pulls/ubclaunchpad/inertia.svg?colorB=0db7ed)](https://cloud.docker.com/u/ubclaunchpad/repository/docker/ubclaunchpad/inertia/general)
 [![](https://img.shields.io/github/stars/ubclaunchpad/inertia.svg?style=social)](https://github.com/ubclaunchpad/inertia)
 
+<script src="https://hypothes.is/embed.js" async></script>
+
 <br />
 
 > **Main Features**
@@ -58,17 +60,21 @@ started to address these problems.
 
 This site primarily documents how to set up and use Inertia - to learn more
 about the project, check out our [GitHub repository](https://github.com/ubclaunchpad/inertia)!
-A complete command reference for the Inertia CLI is also available [here](/cli).
-If you're interested in building on Inertia, check out the [API reference](/api).
+Additional resources you might want to consult include:
 
-If you're looking for the latest pre-release documentation, check out the
-[*preview* versions of our documentation](https://inertia.ubclaunchpad.com/tip).
-Note that `/tip` documentation includes unreleased features and changes.
+* [complete command reference for the Inertia CLI](/cli)
+* [API reference for the Inertia daemon](/api)
 
 <aside class="notice">
 This page is a <b>work in progress</b> - if anything seems incomplete or unclear,
 please feel free to
 <a href='https://github.com/ubclaunchpad/inertia/issues/new/choose'>open a ticket</a>!
+</aside>
+
+<aside class="warning">
+If you're looking for the latest pre-release documentation, check out the
+<a href="https://inertia.ubclaunchpad.com/tip"><i>preview</i> versions of our documentation</a>.
+Note that <code>/tip/...</code> documentation includes unreleased features and changes.
 </aside>
 
 # Getting Started
@@ -81,7 +87,7 @@ brew install ubclaunchpad/tap/inertia
 > Node.js users can install the CLI using [npm](https://www.npmjs.com/get-npm): 
 
 ```shell
-npm install -g inertia-cli
+npm install -g @ubclaunchpad/inertia
 ```
 
 > Windows users can install the CLI using [Scoop](http://scoop.sh):
@@ -89,12 +95,6 @@ npm install -g inertia-cli
 ```shell
 scoop bucket add ubclaunchpad https://github.com/ubclaunchpad/scoop-bucket
 scoop install inertia
-```
-
-> To build and install the CLI from source:
-
-```shell
-go get -u github.com/ubclaunchpad/inertia
 ```
 
 The Inertia command line interface (CLI) can be installed from a few package
@@ -212,7 +212,7 @@ used to access it. Inertia will also need a few ports exposed, namely one for
 the Inertia daemon (port `4303` by default) and whatever ports you need for your
 deployed project.
 
-Configured remotes are stored globally in `~/.inertia/inertia.global`.
+Configured remotes are stored globally in `~/.inertia/inertia.remotes`.
 
 <aside class="notice">
 If you use a non-standard SSH port (i.e. not port <code>22</code>) or want to
@@ -334,7 +334,7 @@ inertia remote ls
 inertia remote show ${remote_name}
 ```
 
-> An example `~/.inertia/inertia.global`:
+> An example `~/.inertia/inertia.remotes`:
 
 ```toml
 # ... other stuff
@@ -374,7 +374,7 @@ inertia remote show my_remote
 ```
 
 Once you've added a remote, remote-specific settings are available in
-`~/.inertia/inertia.global`.
+`~/.inertia/inertia.remotes`.
 
 <aside class="notice">
 For the most part, unless you filled in something incorrectly while adding a
@@ -594,7 +594,22 @@ inertia --version # verify installation
 inertia ${remote_name} upgrade --all
 ```
 
-TODO
+The version of Inertia you are using can be seen in Inertia's `inertia.toml`
+configuration file, or by running `inertia --version`. The version in
+`inertia.toml` is used to determine what version of the Inertia daemon to use
+when you run `inertia ${remote_name} init`.
+
+You can manually change the daemon version used by editing the Inertia
+configuration file. If you are building from source, you can also check out the
+desired version and run `make inertia-tagged` or `make RELEASE=$STREAM`.
+Inertia daemon releases are tagged as follows:
+
+- `v0.x.x` denotes [official, tagged releases](https://github.com/ubclaunchpad/inertia/releases) - these are recommended.
+- `latest` denotes the newest builds on `master`.
+- `canary` denotes experimental builds used for testing and development - do not use this.
+
+You can see the list of available tags on
+[Docker Hub](https://cloud.docker.com/u/ubclaunchpad/repository/docker/ubclaunchpad/inertia/tags).
 
 # Advanced Usage
 
@@ -707,6 +722,19 @@ Inertia depends on such as files in <code>~/inertia/data/</code> and
 <code>~/.inertia</code>, as well as build images such as <code>docker/compose</code>.
 </aside>
 
+## Persistent Data
+
+If your project depends on data on disk that must be persisted across builds, you can
+take advantage of a `/persist` directory that is mounted into your project when it is
+deployed. Data in this directory is not ephemeral and persists across deployments.
+
+<aside class="warning">
+If no pervious deployment is detected when Inertia tries to run a deployment - for
+example, if the repository was removed with <code>inertia [remote] reset</code> -
+this data will be removed. To properly persist data, it is advised that you leverage
+a third-party service (for example, <a href="https://aws.amazon.com/dynamodb/">Amazon DynamoDB</a>).
+</aside>
+
 ## Generating API Keys
 
 ```shell
@@ -725,32 +753,6 @@ curl -H "Authorization: Bearer ${token}" \
 To use these tokens, you can place them in your `inertia.toml` under `token`, or
 use them in requests to the Inertia API by placing them as a `Bearer` token in
 your request header under `Authorization`.
-
-## Inertia Release Streams
-
-The version of Inertia you are using can be seen in Inertia's `inertia.toml`
-configuration file, or by running `inertia --version`. The version in
-`inertia.toml` is used to determine what version of the Inertia daemon to use
-when you run `inertia ${remote_name} init`.
-
-> To switch over to the latest build and upgrade your remote:
-
-```shell
-inertia config set version "latest"
-inertia ${remote_name} upgrade
-```
-
-You can manually change the daemon version used by editing the Inertia
-configuration file. If you are building from source, you can also check out the
-desired version and run `make inertia-tagged` or `make RELEASE=$STREAM`.
-Inertia daemon releases are tagged as follows:
-
-- `v0.x.x` denotes [official, tagged releases](https://github.com/ubclaunchpad/inertia/releases) - these are recommended.
-- `latest` denotes the newest builds on `master`.
-- `canary` denotes experimental builds used for testing and development - do not use this.
-
-You can see the list of available tags on
-[Docker Hub](https://cloud.docker.com/u/ubclaunchpad/repository/docker/ubclaunchpad/inertia/tags).
 
 ## Custom SSL Certificate
 
@@ -771,6 +773,28 @@ Just place your SSL certificate and key on your remote in `~/.inertia/ssl` as
 `daemon.cert` and `daemon.key` respectively, and the Inertia daemon will use
 them automatically.
 
+## Intermediary Containers
+
+<aside class="warning">
+This is an experimental solution to a problem we've run into - refer to
+<a href="https://github.com/ubclaunchpad/inertia/issues/607">#607</a> for more details.
+</aside>
+
+```toml
+name = "my_project"
+# ...
+
+[[profile]]
+  # ...
+  [profile.build]
+    # ...
+    intermediary_containers = [ "nginx" ]
+```
+
+You can declare "intermediary" containers used during builds that don't persist for the lifetime of
+your project - for example, containers that run tasks. This tells the Inertia daemon not to worry
+if it detects that containers with the given names die.
+
 # Miscellaneous
 
 ## Learn More
@@ -783,7 +807,7 @@ them automatically.
 > * [Daemon, API, and Builds](https://github.com/ubclaunchpad/inertia/wiki/Daemon,-API,-and-Builds)
 > * [Web App](https://github.com/ubclaunchpad/inertia/wiki/Web-App)
 > * [CI Pipeline](https://github.com/ubclaunchpad/inertia/wiki/CI-Pipeline)
-> * [Documentation](https://godoc.org/github.com/ubclaunchpad/inertia)
+> * [Documentation](https://pkg.go.dev/github.com/ubclaunchpad/inertia/)
 
 Check out our [GitHub repository](https://github.com/ubclaunchpad/inertia) and
 [Wiki](https://github.com/ubclaunchpad/inertia/wiki)!
@@ -799,6 +823,14 @@ Check out our [GitHub repository](https://github.com/ubclaunchpad/inertia) and
 Add a cool Inertia badge to your README if you use Inertia!
 
 [![Deployed with Inertia](https://img.shields.io/badge/deploying%20with-inertia-blue.svg)](https://github.com/ubclaunchpad/inertia)
+
+```markdown
+![inertia status](https://img.shields.io/endpoint?url=https://INERTIA_ADDRESS:4303/status?badge=true)
+```
+
+A live status badge is also available - just replace `INERTIA_ADDRESS` in the example with the
+address of your Inertia daemon and you'll be able to check on the status of your project using
+the badge!
 
 # Contributing
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ubclaunchpad/inertia/cfg"
 	"github.com/ubclaunchpad/inertia/client"
@@ -25,7 +26,8 @@ func newIntegrationClient() *client.Client {
 			SSHPort:      "69",
 		},
 		Daemon: &cfg.Daemon{
-			Port: "4303",
+			Port:          "4303",
+			WebHookSecret: "sekret",
 		},
 	}
 	return client.NewClient(remote, client.Options{
@@ -41,13 +43,14 @@ func TestBootstrap_Integration(t *testing.T) {
 	}
 
 	var c = newIntegrationClient()
-	assert.NoError(t, Bootstrap(c, Options{Out: os.Stdout}))
+	c.WithDebug(true) // makes troubleshooting tests easier
+	require.NoError(t, Bootstrap(c, Options{Out: os.Stdout}), "bootstrap failed")
 
 	// Daemon setup takes a bit of time - do a crude wait
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Check if daemon is online following bootstrap
 	status, err := c.Status(context.Background())
-	assert.NoError(t, err)
+	require.NoError(t, err, "status check of bootstrapped daemon failed")
 	assert.Equal(t, "test", status.InertiaVersion)
 }

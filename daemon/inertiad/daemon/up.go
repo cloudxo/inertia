@@ -30,14 +30,20 @@ func (s *Server) upHandler(w http.ResponseWriter, r *http.Request) {
 	var gitOpts = upReq.GitOptions
 
 	// apply configuration updates
-	s.state.WebhookSecret = upReq.WebHookSecret
-	s.deployment.SetConfig(project.DeploymentConfig{
-		ProjectName:   upReq.Project,
-		BuildType:     upReq.BuildType,
-		BuildFilePath: upReq.BuildFilePath,
-		RemoteURL:     gitOpts.RemoteURL,
-		Branch:        gitOpts.Branch,
-	})
+	if upReq.WebHookSecret != "" {
+		s.state.WebhookSecret = upReq.WebHookSecret
+	}
+	conf := project.DeploymentConfig{
+		ProjectName:            upReq.Project,
+		BuildType:              upReq.BuildType,
+		BuildFilePath:          upReq.BuildFilePath,
+		RemoteURL:              gitOpts.RemoteURL,
+		Branch:                 gitOpts.Branch,
+		PemFilePath:            crypto.DaemonGithubKeyLocation,
+		IntermediaryContainers: upReq.IntermediaryContainers,
+		SlackNotificationURL:   upReq.SlackNotificationURL,
+	}
+	s.deployment.SetConfig(conf)
 
 	// Configure streamer
 	var stream = log.NewStreamer(log.StreamerOptions{
@@ -52,17 +58,7 @@ func (s *Server) upHandler(w http.ResponseWriter, r *http.Request) {
 	var skipUpdate = false
 	if status, _ := s.deployment.GetStatus(s.docker); status.CommitHash == "" {
 		stream.Println("No deployment detected")
-		if err = s.deployment.Initialize(
-			project.DeploymentConfig{
-				ProjectName:   upReq.Project,
-				BuildType:     upReq.BuildType,
-				BuildFilePath: upReq.BuildFilePath,
-				RemoteURL:     gitOpts.RemoteURL,
-				Branch:        gitOpts.Branch,
-				PemFilePath:   crypto.DaemonGithubKeyLocation,
-			},
-			stream,
-		); err != nil {
+		if err = s.deployment.Initialize(conf, stream); err != nil {
 			stream.Error(res.Err(err.Error(), http.StatusPreconditionFailed))
 			return
 		}
@@ -98,9 +94,8 @@ func (s *Server) upHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update container management history following a successful build and deployment
-	err = s.deployment.UpdateContainerHistory(s.docker)
-	if err != nil {
-		stream.Error(res.ErrInternalServer("failed to update container history following build", err))
+	if err = s.deployment.UpdateContainerHistory(s.docker); err != nil {
+		stream.Println("warning: failed to update container history:", err)
 	}
 
 	stream.Success(res.Msg("Project startup initiated!", http.StatusCreated))

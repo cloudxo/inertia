@@ -7,9 +7,9 @@
 </p>
 
 <p align="center">
-  <a href="https://travis-ci.org/ubclaunchpad/inertia">
-    <img src="https://travis-ci.org/ubclaunchpad/inertia.svg?branch=master"
-      alt="Travis Build Status" />
+  <a href="https://github.com/ubclaunchpad/inertia/actions?workflow=Pipeline">
+    <img src="https://github.com/ubclaunchpad/inertia/workflows/Pipeline/badge.svg"
+      alt="Build Status" />
   </a>
 
   <a href="https://ci.appveyor.com/project/ubclaunchpad/inertia">
@@ -22,12 +22,12 @@
       alt="Clean code" />
   </a>
 
-  <a href="https://godoc.org/github.com/ubclaunchpad/inertia">
-    <img src="https://godoc.org/github.com/ubclaunchpad/inertia?status.svg"
-      alt="GoDocs available" />
+  <a href="https://pkg.go.dev/github.com/ubclaunchpad/inertia">
+    <img src="https://pkg.go.dev/badge/github.com/ubclaunchpad/inertia"
+      alt="go.pkg.dev documentation available" />
   </a>
 
-  <a href="https://cloud.docker.com/u/ubclaunchpad/repository/docker/ubclaunchpad/inertia/general">
+  <a href="https://hub.docker.com/r/ubclaunchpad/inertia">
     <img src="https://img.shields.io/docker/pulls/ubclaunchpad/inertia.svg?colorB=0db7ed"
       alt="inertiad image">
   </a>
@@ -55,7 +55,11 @@
 
 <br>
 
-Inertia is a simple cross-platform command line application that enables quick and easy setup and management of continuous, automated deployment of a variety of project types on any virtual private server. The project is used, built, and maintained with :heart: by [UBC Launch Pad](https://www.ubclaunchpad.com/), UBC's student-run software engineering club.
+Inertia is a user-friendly, cross-platform command line application and serverside
+agent that enables quick and easy setup and management of continuous, automated
+deployment of a variety of project types on any virtual private server. The
+project is used, built, and maintained with :heart: by [UBC Launch Pad](https://www.ubclaunchpad.com/),
+UBC's student-run software engineering club.
 
 |   | Main Features  |
 ----|-----------------
@@ -84,11 +88,14 @@ If you...
 
 * want a simple utility to quickly build and deploy the latest iterations of your projects
 * are new to the concept of "deployment" and related tooling
-* are not deploying to production
 * are on a tight budget and need to switch between cloud providers as your free trials run out
 * want some lightweight team features for managing your deployment
 
-Inertia might be for you!
+Inertia might be for you! For example, [UBC Launch Pad](https://www.ubclaunchpad.com/)
+teams have used Inertia to set up automated deployments for projects like
+[Rocket 2](https://github.com/ubclaunchpad/rocket2) and [Bumper](https://github.com/ubclaunchpad/bumper),
+and [nwPlus](https://www.nwplus.io/) used Inertia to stage previews of the
+[nwHacks 2019 website](https://github.com/nwplus/nwhacks2019) during development.
 
 <br><br>
 

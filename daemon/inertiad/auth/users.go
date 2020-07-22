@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/ubclaunchpad/inertia/daemon/inertiad/crypto"
 	bolt "go.etcd.io/bbolt"
@@ -15,7 +16,7 @@ var (
 )
 
 const (
-	loginAttemptsLimit = 10
+	masterKey = "master"
 )
 
 // userProps are properties associated with user, used
@@ -57,7 +58,7 @@ func newUserManager(dbPath string) (*userManager, error) {
 		if err != nil {
 			return err
 		}
-		return users.Put([]byte("master"), bytes)
+		return users.Put([]byte(masterKey), bytes)
 	})
 	if err != nil {
 		return nil, err
@@ -75,12 +76,16 @@ func (m *userManager) Close() error {
 // Reset deletes all users and drops all active sessions
 func (m *userManager) Reset() error {
 	return m.db.Update(func(tx *bolt.Tx) error {
-		err := tx.DeleteBucket(m.usersBucket)
-		if err != nil {
-			return err
-		}
-		_, err = tx.CreateBucket(m.usersBucket)
-		return err
+		users := tx.Bucket(m.usersBucket)
+		return users.ForEach(func(username, v []byte) error {
+			if string(username) != masterKey {
+				if err := users.Delete(username); err != nil {
+					tx.Rollback()
+					return err
+				}
+			}
+			return nil
+		})
 	})
 }
 
@@ -177,22 +182,19 @@ func (m *userManager) IsCorrectCredentials(username, password string) (*userProp
 			// Track number of login attempts
 			props.LoginAttempts++
 
-			// If user hasn't reached limit, update with new attempt count
-			if props.LoginAttempts <= loginAttemptsLimit {
-				bytes, err := json.Marshal(props)
-				if err != nil {
-					return err
-				}
-				return users.Put(key, bytes)
+			// We went through several iterations of behaviour here, but each one had issues with
+			// potential DOS attacks:
+			// * exponential backoffs
+			// * deleting user after x attempts
+			// For now, it seems the best response is to do nothing, and allow unlimited attempts.
+			// Eventually, we might want to add some sort of reset mechanism when a limit is reached.
+			// We'll maintain the behaviour of tracking login attempts just in case - it might be
+			// useful for auditing.
+			bytes, err := json.Marshal(props)
+			if err != nil {
+				return fmt.Errorf("failed to update user: %w", err)
 			}
-
-			// Otherwise, delete user
-			users.Delete(key)
-
-			// Rollback will occur if transaction returns an error, so store in
-			// variable instead. TODO: don't delete?
-			userErr = errors.New("Too many login attempts - user deleted")
-			return nil
+			return users.Put(key, bytes)
 		}
 
 		// Reset attempts to 0 if login successful

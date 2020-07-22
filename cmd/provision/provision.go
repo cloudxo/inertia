@@ -20,7 +20,7 @@ import (
 // ProvisionCmd is the parent class for the 'inertia provision' subcommands
 type ProvisionCmd struct {
 	*cobra.Command
-	config  *cfg.Inertia
+	remotes *cfg.Remotes
 	project *cfg.Project
 	cfgPath string
 }
@@ -39,7 +39,7 @@ func AttachProvisionCmd(inertia *core.Cmd) {
 		Long:  `Provisions a new remote host set up for continuous deployment with Inertia.`,
 		PersistentPreRun: func(*cobra.Command, []string) {
 			var err error
-			prov.config, err = local.GetInertiaConfig()
+			prov.remotes, err = local.GetRemotes()
 			if err != nil {
 				out.Fatalf(err.Error())
 			}
@@ -84,8 +84,7 @@ This ensures that your project ports are properly exposed and externally accessi
 `,
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			var config = root.config
-			if _, found := config.GetRemote(args[0]); found {
+			if _, found := root.remotes.GetRemote(args[0]); found {
 				out.Fatal("remote with name already exists")
 			}
 
@@ -125,7 +124,7 @@ This ensures that your project ports are properly exposed and externally accessi
 					out.Fatal(err)
 				}
 			} else {
-				keyID, key, err := input.EnterEC2CredentialsWalkthrough()
+				keyID, key, err := enterEC2CredentialsWalkthrough()
 				if err != nil {
 					out.Fatal(err)
 				}
@@ -140,7 +139,9 @@ This ensures that your project ports are properly exposed and externally accessi
 
 			// Prompt for region
 			out.Println("See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions for a list of available regions.")
-			region, err := input.Prompt(highlight.S("Please enter a region: "))
+			region, err := input.NewPrompt(nil).
+				Prompt(highlight.S("Please enter a region: ")).
+				GetString()
 			if err != nil {
 				out.Fatal(err)
 			}
@@ -151,7 +152,10 @@ This ensures that your project ports are properly exposed and externally accessi
 			if err != nil {
 				out.Fatal(err)
 			}
-			image, err := input.ChooseFromListWalkthrough("image", images)
+			// allow arbitrary
+			image, err := input.NewPrompt(&input.PromptConfig{AllowInvalid: true}).
+				PromptFromList("image", images).
+				GetString()
 			if err != nil {
 				out.Fatal(err)
 			}

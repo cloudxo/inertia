@@ -21,7 +21,7 @@ func getVersion(version string) string {
 }
 
 // NewInertiaCmd is a new Inertia command
-func NewInertiaCmd(version, inertiaConfigPath string) *core.Cmd {
+func NewInertiaCmd(version, inertiaConfigPath string, validateConfig bool) *core.Cmd {
 	cobra.EnableCommandSorting = false
 
 	// instantiate top-level command
@@ -34,7 +34,7 @@ func NewInertiaCmd(version, inertiaConfigPath string) *core.Cmd {
 	}
 
 	// persistent flags across all children
-	root.PersistentFlags().StringVar(&root.ProjectConfigPath, "config", "inertia.toml", "specify relative path to Inertia configuration")
+	root.PersistentFlags().StringVar(&root.ProjectConfigPath, "config", "inertia.toml", "specify relative path to Inertia project configuration")
 	root.PersistentFlags().Bool("simple", false, "disable colour and emoji output")
 	// hack in flag parsing - this must be done because we need to initialize the
 	// host commands properly when Cobra first constructs the command tree, which
@@ -77,7 +77,7 @@ Global inertia configuration is stored in '%s'.
 	attachContribPlugins(root)
 
 	// attach configured remotes last
-	remotescmd.AttachRemotesCmds(root)
+	remotescmd.AttachRemotesCmds(root, validateConfig)
 
 	return root
 }

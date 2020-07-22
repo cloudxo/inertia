@@ -25,9 +25,7 @@ lint:
 	go vet ./...
 	go test -run xxxx ./...
 	diff -u <(echo -n) <(gofmt -d -s `find . -type f -name '*.go' -not -path "./vendor/*"`)
-	diff -u <(echo -n) <(golint `go list ./... | grep -v /vendor/`)
-	(cd ./daemon/web; npm run lint)
-	(cd ./daemon/web; npm run sass-lint)
+	diff -u <(echo -n) <(go run golang.org/x/lint/golint `go list ./... | grep -v /vendor/`)
 
 ## clean: remove testenv, binaries, build directories, caches, and more
 .PHONY: clean
@@ -71,30 +69,6 @@ daemon:
 ## gen: rewrite all generated code (mocks, scripts, etc.)
 .PHONY: gen
 gen: scripts mocks
-
-##    ___
-##  * WEB
-##    ‾‾‾
-
-## web-deps: install Inertia Web dependencies. use PACKAGE to install specific package
-.PHONY: web-deps
-web-deps:
-	(cd ./daemon/web; npm install $(PACKAGE))
-
-## web-run: run local development instance of Inertia Web
-.PHONY: web-run
-web-run:
-	(cd ./daemon/web; npm start)
-
-## web-sandbox: run sandboxed development instance of Inertia Web
-.PHONY: web-run
-web-run-sandbox:
-	(cd ./daemon/web; npm start:sandbox)
-
-## web-build: build Inertia Web
-.PHONY: web-build
-web-build:
-	(cd ./daemon/web; npm install --production; npm run build)
 
 ##    _______
 ##  * TESTING
@@ -191,14 +165,11 @@ run-docs-api:
 ## prod-deps: install only production dependencies
 .PHONY: prod-deps
 prod-deps:
-	dep ensure -v
-	make web-deps
+	go mod download
 
 ## dev-deps: install only development dependencies and tools
 .PHONY: dev-deps
 dev-deps:
-	go get -u github.com/UnnoTed/fileb0x
-	go get -u golang.org/x/lint/golint
 	npm install -g redoc-cli
 
 ## docker-deps: download required docker containers
@@ -209,17 +180,19 @@ docker-deps:
 ## mocks: generate Go mocks
 .PHONY: mocks
 mocks:
-	counterfeiter -o ./client/runner/mocks/session.go \
+	go run github.com/maxbrunsfeld/counterfeiter/v6 -o ./client/runner/mocks/session.go \
 		./client/runner/ssh.go SSHSession
-	counterfeiter -o ./daemon/inertiad/project/mocks/deployer.go \
+	go run github.com/maxbrunsfeld/counterfeiter/v6 -o ./daemon/inertiad/project/mocks/deployer.go \
 		./daemon/inertiad/project/deployment.go Deployer
-	counterfeiter -o ./daemon/inertiad/build/mocks/builder.go \
+	go run github.com/maxbrunsfeld/counterfeiter/v6 -o ./daemon/inertiad/build/mocks/builder.go \
 		./daemon/inertiad/build/builder.go ContainerBuilder
+	go run github.com/maxbrunsfeld/counterfeiter/v6 -o ./daemon/inertiad/notify/mocks/notify.go \
+		./daemon/inertiad/notify/notifier.go Notifier
 
 ## scripts: recompile script assets
 .PHONY: scripts
 scripts:
-	fileb0x b0x.yml
+	go run github.com/UnnoTed/fileb0x b0x.yml
 
 ## testdaemon-scp: copy test daemon image from ./images to test VPS
 .PHONY: testdaemon-scp

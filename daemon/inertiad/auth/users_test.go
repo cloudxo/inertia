@@ -59,6 +59,12 @@ func TestAllUserManagementOperations(t *testing.T) {
 
 	err = manager.HasUser("bobheadxi")
 	assert.Equal(t, errUserNotFound, err)
+
+	// reset should not remove master key
+	err = manager.Reset()
+	assert.NoError(t, err)
+	err = manager.HasUser(masterKey)
+	assert.NoError(t, err)
 }
 
 func TestIsAdmin(t *testing.T) {
@@ -95,32 +101,6 @@ func TestRemoveUser(t *testing.T) {
 
 	err = manager.RemoveUser("bobheadxi")
 	assert.NoError(t, err)
-
-	err = manager.HasUser("bobheadxi")
-	assert.NotNil(t, err)
-	assert.Equal(t, errUserNotFound, err)
-}
-
-func TestTooManyLogins(t *testing.T) {
-	dir := "./test_users_login_limit"
-	manager, err := getTestUserManager(dir)
-	defer os.RemoveAll(dir)
-	assert.NoError(t, err)
-	defer manager.Close()
-
-	err = manager.AddUser("bobheadxi", "best_person_ever", true)
-	assert.NoError(t, err)
-
-	for i := 0; i < loginAttemptsLimit; i++ {
-		_, correct, err := manager.IsCorrectCredentials("bobheadxi", "not_quite_best")
-		assert.NoError(t, err)
-		assert.False(t, correct)
-	}
-
-	_, correct, err := manager.IsCorrectCredentials("bobheadxi", "not_quite_best")
-	assert.False(t, correct)
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "login attempts")
 
 	err = manager.HasUser("bobheadxi")
 	assert.NotNil(t, err)

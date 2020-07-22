@@ -22,12 +22,37 @@ import (
 
 // AttachRemotesCmds reads configuration to attach a child command for each
 // configured remote in the configuration
-func AttachRemotesCmds(root *core.Cmd) {
-	project, err := local.GetProject(root.ProjectConfigPath)
-	if err != nil {
-		return
+func AttachRemotesCmds(root *core.Cmd, validateConfig bool) {
+	project, _ := local.GetProject(root.ProjectConfigPath)
+
+	// execute some project validation, since AttachRemotesCmds always runs
+	if project != nil && validateConfig {
+		if project.InertiaMinVersion == "" {
+			// init version if none is set
+			project.InertiaMinVersion = root.Version
+			local.Write(root.ProjectConfigPath, project)
+		} else {
+			// else validate the provided version
+			var msg string
+			warn, err := project.ValidateVersion(root.Version)
+			if err != nil || warn != "" {
+				if err != nil {
+					msg += out.C(":warning: error when validating project configuration against CLI version: %s\n",
+						out.RD, out.BO).With(err).String()
+				}
+				if warn != "" {
+					msg += out.C(":warning: warning when validating project configuration against CLI version: %s\n",
+						out.YE, out.BO).With(warn).String()
+				}
+				msg += out.C("for details on the latest Inertia releases, please see https://github.com/ubclaunchpad/inertia/releases/latest\n",
+					out.BO).String()
+			}
+			out.Println(msg)
+		}
 	}
-	cfg, err := local.GetInertiaConfig()
+
+	// parse and attach remotes
+	cfg, err := local.GetRemotes()
 	if err != nil {
 		return
 	}
@@ -35,12 +60,12 @@ func AttachRemotesCmds(root *core.Cmd) {
 	for _, r := range cfg.Remotes {
 		if _, ok := remotes[r.Name]; ok {
 			out.Fatalf("you have configured multiple remotes named '%s' - please rename one in %s",
-				r.Name, local.InertiaConfigPath())
+				r.Name, local.InertiaRemotesPath())
 		}
 		for _, child := range root.Commands() {
 			if child.Name() == r.Name {
 				out.Fatalf("you have configured a remote named '%s', which is an Inertia command - please rename it in %s",
-					r.Name, local.InertiaConfigPath())
+					r.Name, local.InertiaRemotesPath())
 			}
 		}
 		remotes[r.Name] = true
@@ -113,8 +138,11 @@ If the SSH key for your remote requires a passphrase, it can be provided via 'ID
 
 Run 'inertia [remote] init' to gather this information.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if host.client == nil || host.project == nil {
+			if host.client == nil {
 				out.Fatal("failed to read configuration")
+			}
+			if host.project == nil {
+				out.Fatal("no project found in current directory - try 'inertia init'")
 			}
 			if host.getRemote().Version != inertia.Version {
 				out.Printf("[WARNING] Remote configuration version '%s' does not match your Inertia CLI version '%s'\n",
@@ -232,7 +260,7 @@ Requires the Inertia daemon to be active on your remote - do this by running 'in
 			}
 			out.Printf("daemon on remote '%s' is online at %s\n",
 				root.remote, host)
-			out.Println(out.FormatStatus(status))
+			out.Println(out.FormatStatus("robert", status))
 		},
 	}
 	root.AddCommand(stat)
@@ -455,27 +483,49 @@ directory (~/inertia) from your remote host.`,
 }
 
 func (root *HostCmd) attachTokenCmd() {
-	var token = &cobra.Command{
+	var tokenCmd = &cobra.Command{
 		Use:   "token",
 		Short: "Generate tokens associated with permission levels for admin to share.",
 		Long:  `Generate tokens associated with permission levels for team leads to share`,
 		Run: func(cmd *cobra.Command, args []string) {
-			token, err := root.client.Token(root.ctx)
+			useSSH, err := cmd.Flags().GetBool("ssh")
 			if err != nil {
 				out.Fatal(err)
+			}
+			var token string
+			if useSSH {
+				sshc, err := root.client.GetSSHClient()
+				if err != nil {
+					out.Fatal(err.Error())
+				}
+				if err = sshc.AssignAPIToken(); err != nil {
+					out.Fatal(err.Error())
+				}
+				token = root.client.Remote.Daemon.Token
+			} else {
+				token, err = root.client.Token(root.ctx)
+				if err != nil {
+					out.Fatal(err)
+				}
 			}
 			out.Println(token)
 		},
 	}
-	root.AddCommand(token)
+	tokenCmd.Flags().Bool("ssh", false, "generate token over SSH")
+	root.AddCommand(tokenCmd)
 }
 
 func (root *HostCmd) attachUpgradeCmd() {
-	const flagVersion = "version"
+	const (
+		flagVersion = "version"
+	)
 	var upgrade = &cobra.Command{
 		Use:   "upgrade",
 		Short: "Upgrade Inertia daemon to match the CLI.",
-		Long:  `Restarts the Inertia daemon to upgrade it to the same version as your CLI`,
+		Long: `Restarts the Inertia daemon to upgrade it to the same version as your CLI.
+
+To upgrade your remote, you must upgrade your CLI first to the correct version - drop by
+https://github.com/ubclaunchpad/inertia/releases/latest for more details.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			sshc, err := root.client.GetSSHClient()
 			if err != nil {
@@ -487,13 +537,16 @@ func (root *HostCmd) attachUpgradeCmd() {
 				out.Fatal(err)
 			}
 
-			var version = root.getRemote().Version
 			if v, _ := cmd.Flags().GetString(flagVersion); v != "" {
-				version = v
+				root.getRemote().Version = v
 			}
 
-			out.Printf("Starting up the Inertia daemon (version %s)\n", version)
+			out.Printf("Starting up the Inertia daemon (version %s)\n", root.getRemote().Version)
 			if err := sshc.DaemonUp(); err != nil {
+				out.Fatal(err)
+			}
+
+			if err := local.SaveRemote(root.getRemote()); err != nil {
 				out.Fatal(err)
 			}
 		},

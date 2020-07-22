@@ -197,20 +197,20 @@
   color: #f92672;
 }
     </style>
-    <link href="stylesheets/screen.css" rel="stylesheet" media="screen" />
-    <link href="stylesheets/print.css" rel="stylesheet" media="print" />
-      <script src="javascripts/all_nosearch.js"></script>
+    <link href="stylesheets/screen-af868d8f.css" rel="stylesheet" media="screen" />
+    <link href="stylesheets/print-4373c1b9.css" rel="stylesheet" media="print" />
+      <script src="javascripts/all_nosearch-c275c2f6.js"></script>
   </head>
 
   <body class="index" data-languages="[]">
     <a href="#" id="nav-button">
       <span>
         NAV
-        <img src="images/navbar.png" alt="Navbar" />
+        <img src="images/navbar-cad8cdcb.png" alt="Navbar" />
       </span>
     </a>
     <div class="toc-wrapper">
-      <img src="images/logo.png" class="logo" alt="Logo" />
+      <img src="images/logo-a410de0a.png" class="logo" alt="Logo" />
       <ul id="toc" class="toc-list-h1">
           <li>
             <a href="#inertia" class="toc-h1 toc-link" data-title="Inertia">Inertia</a>
@@ -284,13 +284,16 @@
                     <a href="#resource-management" class="toc-h2 toc-link" data-title="Resource Management">Resource Management</a>
                   </li>
                   <li>
+                    <a href="#persistent-data" class="toc-h2 toc-link" data-title="Persistent Data">Persistent Data</a>
+                  </li>
+                  <li>
                     <a href="#generating-api-keys" class="toc-h2 toc-link" data-title="Generating API Keys">Generating API Keys</a>
                   </li>
                   <li>
-                    <a href="#inertia-release-streams" class="toc-h2 toc-link" data-title="Inertia Release Streams">Inertia Release Streams</a>
+                    <a href="#custom-ssl-certificate" class="toc-h2 toc-link" data-title="Custom SSL Certificate">Custom SSL Certificate</a>
                   </li>
                   <li>
-                    <a href="#custom-ssl-certificate" class="toc-h2 toc-link" data-title="Custom SSL Certificate">Custom SSL Certificate</a>
+                    <a href="#intermediary-containers" class="toc-h2 toc-link" data-title="Intermediary Containers">Intermediary Containers</a>
                   </li>
               </ul>
           </li>
@@ -324,6 +327,8 @@
 <p><a href="https://github.com/ubclaunchpad/inertia/releases/latest"><img src="https://img.shields.io/github/release/ubclaunchpad/inertia.svg" alt="Inertia" /></a>
 <a href="https://cloud.docker.com/u/ubclaunchpad/repository/docker/ubclaunchpad/inertia/general"><img src="https://img.shields.io/docker/pulls/ubclaunchpad/inertia.svg?colorB=0db7ed" alt="Inertia" /></a>
 <a href="https://github.com/ubclaunchpad/inertia"><img src="https://img.shields.io/github/stars/ubclaunchpad/inertia.svg?style=social" alt="Inertia" /></a></p>
+
+<script src="https://hypothes.is/embed.js" async></script>
 
 <p><br /></p>
 
@@ -364,17 +369,23 @@ started to address these problems.</p>
 
 <p>This site primarily documents how to set up and use Inertia - to learn more
 about the project, check out our <a href="https://github.com/ubclaunchpad/inertia">GitHub repository</a>!
-A complete command reference for the Inertia CLI is also available <a href="/cli">here</a>.
-If you&#39;re interested in building on Inertia, check out the <a href="/api">API reference</a>.</p>
+Additional resources you might want to consult include:</p>
 
-<p>If you&#39;re looking for the latest pre-release documentation, check out the
-<a href="https://inertia.ubclaunchpad.com/tip"><em>preview</em> versions of our documentation</a>.
-Note that <code>/tip</code> documentation includes unreleased features and changes.</p>
+<ul>
+<li><a href="/cli">complete command reference for the Inertia CLI</a></li>
+<li><a href="/api">API reference for the Inertia daemon</a></li>
+</ul>
 
 <aside class="notice">
 This page is a <b>work in progress</b> - if anything seems incomplete or unclear,
 please feel free to
 <a href='https://github.com/ubclaunchpad/inertia/issues/new/choose'>open a ticket</a>!
+</aside>
+
+<aside class="warning">
+If you're looking for the latest pre-release documentation, check out the
+<a href="https://inertia.ubclaunchpad.com/tip"><i>preview</i> versions of our documentation</a>.
+Note that <code>/tip/...</code> documentation includes unreleased features and changes.
 </aside>
 <h1 id='getting-started'>Getting Started</h1>
 <blockquote>
@@ -385,18 +396,13 @@ please feel free to
 <blockquote>
 <p>Node.js users can install the CLI using <a href="https://www.npmjs.com/get-npm">npm</a>: </p>
 </blockquote>
-<pre class="highlight shell tab-shell"><code>npm install -g inertia-cli
+<pre class="highlight shell tab-shell"><code>npm install -g @ubclaunchpad/inertia
 </code></pre>
 <blockquote>
 <p>Windows users can install the CLI using <a href="http://scoop.sh">Scoop</a>:</p>
 </blockquote>
 <pre class="highlight shell tab-shell"><code>scoop bucket add ubclaunchpad https://github.com/ubclaunchpad/scoop-bucket
 scoop install inertia
-</code></pre>
-<blockquote>
-<p>To build and install the CLI from source:</p>
-</blockquote>
-<pre class="highlight shell tab-shell"><code>go get -u github.com/ubclaunchpad/inertia
 </code></pre>
 <p>The Inertia command line interface (CLI) can be installed from a few package
 managers such as npm, Homebrew and Scoop. For other platforms, you can 
@@ -528,7 +534,7 @@ used to access it. Inertia will also need a few ports exposed, namely one for
 the Inertia daemon (port <code>4303</code> by default) and whatever ports you need for your
 deployed project.</p>
 
-<p>Configured remotes are stored globally in <code>~/.inertia/inertia.global</code>.</p>
+<p>Configured remotes are stored globally in <code>~/.inertia/inertia.remotes</code>.</p>
 
 <aside class="notice">
 If you use a non-standard SSH port (i.e. not port <code>22</code>) or want to
@@ -558,7 +564,7 @@ affordable, and a good choice to get started with.</p>
 
 <blockquote>
 <p>The IAM users page:
-<img src="images/aws-ec2-iam-add.png" alt="Aws ec2 iam add" /></p>
+<img src="images/aws-ec2-iam-add-acf0227b.png" alt="Aws ec2 iam add" /></p>
 </blockquote>
 
 <p>To get started, make an account on the <a href="aws.amazon.com">AWS website</a>. If you&#39;re
@@ -574,7 +580,7 @@ configure programmatic access to your AWS account. Under the &quot;Users&quot; t
 
 <blockquote>
 <p>Configuring IAM permissions:
-<img src="images/aws-ec2-iam-perm.png" alt="Aws ec2 iam perm" /></p>
+<img src="images/aws-ec2-iam-perm-408741e4.png" alt="Aws ec2 iam perm" /></p>
 </blockquote>
 
 <p>This will take you through a brief walkthrough to configure your new IAM user:</p>
@@ -646,7 +652,7 @@ your remote, and spin up the Inertia daemon!</p>
 inertia remote show <span class="k">${</span><span class="nv">remote_name</span><span class="k">}</span>
 </code></pre>
 <blockquote>
-<p>An example <code>~/.inertia/inertia.global</code>:</p>
+<p>An example <code>~/.inertia/inertia.remotes</code>:</p>
 </blockquote>
 <pre class="highlight toml tab-toml"><code><span class="c"># ... other stuff</span>
 
@@ -682,7 +688,7 @@ to <code>me</code> and print out the new settings:</p>
 inertia remote show my_remote
 </code></pre>
 <p>Once you&#39;ve added a remote, remote-specific settings are available in
-<code>~/.inertia/inertia.global</code>.</p>
+<code>~/.inertia/inertia.remotes</code>.</p>
 
 <aside class="notice">
 For the most part, unless you filled in something incorrectly while adding a
@@ -894,7 +900,24 @@ inertia --version <span class="c"># verify installation</span>
 </blockquote>
 <pre class="highlight shell tab-shell"><code>inertia <span class="k">${</span><span class="nv">remote_name</span><span class="k">}</span> upgrade --all
 </code></pre>
-<p>TODO</p>
+<p>The version of Inertia you are using can be seen in Inertia&#39;s <code>inertia.toml</code>
+configuration file, or by running <code>inertia --version</code>. The version in
+<code>inertia.toml</code> is used to determine what version of the Inertia daemon to use
+when you run <code>inertia ${remote_name} init</code>.</p>
+
+<p>You can manually change the daemon version used by editing the Inertia
+configuration file. If you are building from source, you can also check out the
+desired version and run <code>make inertia-tagged</code> or <code>make RELEASE=$STREAM</code>.
+Inertia daemon releases are tagged as follows:</p>
+
+<ul>
+<li><code>v0.x.x</code> denotes <a href="https://github.com/ubclaunchpad/inertia/releases">official, tagged releases</a> - these are recommended.</li>
+<li><code>latest</code> denotes the newest builds on <code>master</code>.</li>
+<li><code>canary</code> denotes experimental builds used for testing and development - do not use this.</li>
+</ul>
+
+<p>You can see the list of available tags on
+<a href="https://cloud.docker.com/u/ubclaunchpad/repository/docker/ubclaunchpad/inertia/tags">Docker Hub</a>.</p>
 <h1 id='advanced-usage'>Advanced Usage</h1>
 <p>This section details various advanced usage tips. If you can&#39;t find what you&#39;re
 looking for here, try using the <code>--help</code> flag on relevant commands - Inertia
@@ -992,6 +1015,17 @@ When interacting with your remote over SSH, be wary of manipulating assets that
 Inertia depends on such as files in <code>~/inertia/data/</code> and
 <code>~/.inertia</code>, as well as build images such as <code>docker/compose</code>.
 </aside>
+<h2 id='persistent-data'>Persistent Data</h2>
+<p>If your project depends on data on disk that must be persisted across builds, you can
+take advantage of a <code>/persist</code> directory that is mounted into your project when it is
+deployed. Data in this directory is not ephemeral and persists across deployments.</p>
+
+<aside class="warning">
+If no pervious deployment is detected when Inertia tries to run a deployment - for
+example, if the repository was removed with <code>inertia [remote] reset</code> -
+this data will be removed. To properly persist data, it is advised that you leverage
+a third-party service (for example, <a href="https://aws.amazon.com/dynamodb/">Amazon DynamoDB</a>).
+</aside>
 <h2 id='generating-api-keys'>Generating API Keys</h2><pre class="highlight shell tab-shell"><code>inertia <span class="k">${</span><span class="nv">remote_name</span><span class="k">}</span> token
 </code></pre>
 <p>If you want to develop integrations with Inertia, you&#39;ll probably want a
@@ -1003,31 +1037,6 @@ access to your remote. Be careful not to lose these tokens.</p>
 <p>To use these tokens, you can place them in your <code>inertia.toml</code> under <code>token</code>, or
 use them in requests to the Inertia API by placing them as a <code>Bearer</code> token in
 your request header under <code>Authorization</code>.</p>
-<h2 id='inertia-release-streams'>Inertia Release Streams</h2>
-<p>The version of Inertia you are using can be seen in Inertia&#39;s <code>inertia.toml</code>
-configuration file, or by running <code>inertia --version</code>. The version in
-<code>inertia.toml</code> is used to determine what version of the Inertia daemon to use
-when you run <code>inertia ${remote_name} init</code>.</p>
-
-<blockquote>
-<p>To switch over to the latest build and upgrade your remote:</p>
-</blockquote>
-<pre class="highlight shell tab-shell"><code>inertia config <span class="nb">set </span>version <span class="s2">"latest"</span>
-inertia <span class="k">${</span><span class="nv">remote_name</span><span class="k">}</span> upgrade
-</code></pre>
-<p>You can manually change the daemon version used by editing the Inertia
-configuration file. If you are building from source, you can also check out the
-desired version and run <code>make inertia-tagged</code> or <code>make RELEASE=$STREAM</code>.
-Inertia daemon releases are tagged as follows:</p>
-
-<ul>
-<li><code>v0.x.x</code> denotes <a href="https://github.com/ubclaunchpad/inertia/releases">official, tagged releases</a> - these are recommended.</li>
-<li><code>latest</code> denotes the newest builds on <code>master</code>.</li>
-<li><code>canary</code> denotes experimental builds used for testing and development - do not use this.</li>
-</ul>
-
-<p>You can see the list of available tags on
-<a href="https://cloud.docker.com/u/ubclaunchpad/repository/docker/ubclaunchpad/inertia/tags">Docker Hub</a>.</p>
 <h2 id='custom-ssl-certificate'>Custom SSL Certificate</h2>
 <p>By default, the Inertia daemon generates a self-signed SSL certificate for its
 API. This means that Inertia, by default, doesn&#39;t verify SSL communications,
@@ -1042,6 +1051,23 @@ repository&#39;s webhook deliveries as well.</p>
 <p>Just place your SSL certificate and key on your remote in <code>~/.inertia/ssl</code> as
 <code>daemon.cert</code> and <code>daemon.key</code> respectively, and the Inertia daemon will use
 them automatically.</p>
+<h2 id='intermediary-containers'>Intermediary Containers</h2>
+<aside class="warning">
+This is an experimental solution to a problem we've run into - refer to
+<a href="https://github.com/ubclaunchpad/inertia/issues/607">#607</a> for more details.
+</aside>
+<pre class="highlight toml tab-toml"><code><span class="py">name</span> <span class="p">=</span> <span class="s">"my_project"</span>
+<span class="c"># ...</span>
+
+<span class="nn">[[profile]]</span>
+  <span class="c"># ...</span>
+  <span class="nn">[profile.build]</span>
+    <span class="c"># ...</span>
+    <span class="py">intermediary_containers</span> <span class="p">=</span> <span class="p">[</span> <span class="s">"nginx"</span> <span class="p">]</span>
+</code></pre>
+<p>You can declare &quot;intermediary&quot; containers used during builds that don&#39;t persist for the lifetime of
+your project - for example, containers that run tasks. This tells the Inertia daemon not to worry
+if it detects that containers with the given names die.</p>
 <h1 id='miscellaneous'>Miscellaneous</h1><h2 id='learn-more'>Learn More</h2>
 <blockquote>
 <p>Some quick links to help you get started:</p>
@@ -1053,7 +1079,7 @@ them automatically.</p>
 <li><a href="https://github.com/ubclaunchpad/inertia/wiki/Daemon,-API,-and-Builds">Daemon, API, and Builds</a></li>
 <li><a href="https://github.com/ubclaunchpad/inertia/wiki/Web-App">Web App</a></li>
 <li><a href="https://github.com/ubclaunchpad/inertia/wiki/CI-Pipeline">CI Pipeline</a></li>
-<li><a href="https://godoc.org/github.com/ubclaunchpad/inertia">Documentation</a></li>
+<li><a href="https://pkg.go.dev/github.com/ubclaunchpad/inertia/">Documentation</a></li>
 </ul>
 </blockquote>
 
@@ -1066,6 +1092,11 @@ them automatically.</p>
 <p>Add a cool Inertia badge to your README if you use Inertia!</p>
 
 <p><a href="https://github.com/ubclaunchpad/inertia"><img src="https://img.shields.io/badge/deploying%20with-inertia-blue.svg" alt="Deployed with Inertia" /></a></p>
+<pre class="highlight markdown tab-markdown"><code><span class="p">![</span><span class="nv">inertia status</span><span class="p">](</span><span class="sx">https://img.shields.io/endpoint?url=https://INERTIA_ADDRESS:4303/status?badge=true</span><span class="p">)</span>
+</code></pre>
+<p>A live status badge is also available - just replace <code>INERTIA_ADDRESS</code> in the example with the
+address of your Inertia daemon and you&#39;ll be able to check on the status of your project using
+the badge!</p>
 <h1 id='contributing'>Contributing</h1>
 <p>Any contribution (pull requests, feedback, bug reports, ideas, etc.) is welcome!</p>
 

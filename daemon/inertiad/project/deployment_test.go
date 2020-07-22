@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	docker "github.com/docker/docker/client"
+	gogit "github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/ubclaunchpad/inertia/daemon/inertiad/build/mocks"
 	"github.com/ubclaunchpad/inertia/daemon/inertiad/containers"
-	gogit "gopkg.in/src-d/go-git.v4"
 )
 
 func newDefaultFakeBuilder(builder func() error, stopper func() error) *mocks.FakeContainerBuilder {
@@ -25,16 +25,18 @@ func newDefaultFakeBuilder(builder func() error, stopper func() error) *mocks.Fa
 func TestSetConfig(t *testing.T) {
 	deployment := &Deployment{}
 	deployment.SetConfig(DeploymentConfig{
-		ProjectName:   "wow",
-		Branch:        "amazing",
-		BuildType:     "best",
-		BuildFilePath: "/robertcompose.yml",
+		ProjectName:          "wow",
+		Branch:               "amazing",
+		BuildType:            "best",
+		BuildFilePath:        "/robertcompose.yml",
+		SlackNotificationURL: "https://my.slack.url",
 	})
 
 	assert.Equal(t, "wow", deployment.project)
 	assert.Equal(t, "amazing", deployment.branch)
 	assert.Equal(t, "best", deployment.buildType)
 	assert.Equal(t, "/robertcompose.yml", deployment.buildFilePath)
+	assert.Len(t, deployment.notifiers, 1)
 }
 
 func TestDeployMock(t *testing.T) {
@@ -118,6 +120,7 @@ func TestGetStatusIntegration(t *testing.T) {
 		builder:   fakeBuilder,
 	}
 	status, err := deployment.GetStatus(cli)
+
 	assert.NoError(t, err)
 	assert.False(t, status.BuildContainerActive)
 	assert.Equal(t, "test", status.BuildType)

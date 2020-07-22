@@ -1,13 +1,18 @@
 package remotecmd
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/ubclaunchpad/inertia/cfg"
+	"github.com/ubclaunchpad/inertia/client"
 	"github.com/ubclaunchpad/inertia/cmd/core"
 	"github.com/ubclaunchpad/inertia/cmd/core/utils/input"
 	"github.com/ubclaunchpad/inertia/cmd/core/utils/out"
@@ -18,7 +23,7 @@ import (
 // RemoteCmd is the parent class for the 'inertia remote' subcommands
 type RemoteCmd struct {
 	*cobra.Command
-	config *cfg.Inertia
+	remotes *cfg.Remotes
 }
 
 // AttachRemoteCmd attaches 'remote' subcommands to the given parent command
@@ -27,22 +32,25 @@ func AttachRemoteCmd(inertia *core.Cmd) {
 	remote.Command = &cobra.Command{
 		Use:     "remote",
 		Version: inertia.Version,
+		Aliases: []string{"r"},
 		Short:   "Configure the local settings for a remote host",
 		Long: `Configures local settings for a remote host - add, remove, and list configured
 Inertia remotes.
 
-Requires Inertia to be set up via 'inertia init'.
+Requires Inertia to be set up via 'inertia init'. To see where the remote
+configuration is stored, run 'inertia remote config-path'.
 
 For example:
-inertia init
-inertia remote add gcloud
-inertia gcloud init        # set up Inertia
-inertia gcloud status      # check on status of Inertia daemon
+
+	inertia init
+	inertia remote add gcloud
+	inertia gcloud init        # set up Inertia
+	inertia gcloud status      # check on status of Inertia daemon
 `,
 		PersistentPreRun: func(*cobra.Command, []string) {
 			// Ensure project initialized, load config
 			var err error
-			remote.config, err = local.GetInertiaConfig()
+			remote.remotes, err = local.GetRemotes()
 			if err != nil {
 				out.Fatal(err)
 			}
@@ -51,14 +59,31 @@ inertia gcloud status      # check on status of Inertia daemon
 
 	// add children
 	remote.attachAddCmd()
+	remote.attachLoginCmd()
 	remote.attachShowCmd()
 	remote.attachSetCmd()
 	remote.attachListCmd()
 	remote.attachRemoveCmd()
 	remote.attachUpgradeCmd()
+	remote.attachResetCmd()
+	remote.attachConfigPathCmd()
 
 	// add to parent
 	inertia.AddCommand(remote.Command)
+}
+
+func (root *RemoteCmd) validateRemoteName(name string) error {
+	if _, found := root.remotes.GetRemote(name); found {
+		return fmt.Errorf("remote '%s' already exists", name)
+	}
+	for _, child := range root.Parent().Commands() {
+		if child.Name() == name {
+			return fmt.Errorf(
+				"'%s' is the name of an Inertia command - please choose something else",
+				name)
+		}
+	}
+	return nil
 }
 
 func (root *RemoteCmd) attachAddCmd() {
@@ -84,14 +109,10 @@ Inertia commands.`,
 		Example: "inertia remote add staging --daemon.gen-secret --ip 1.2.3.4",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			if _, found := root.config.GetRemote(args[0]); found {
-				out.Fatalf("remote '%s' already exists", args[0])
+			if err := root.validateRemoteName(args[0]); err != nil {
+				out.Fatalf(err.Error())
 			}
-			for _, child := range root.Parent().Commands() {
-				if child.Name() == args[0] {
-					out.Fatalf("'%s' is the name of an Inertia command - please choose something else", args[0])
-				}
-			}
+
 			homeEnvVar, err := os.UserHomeDir()
 			if err != nil {
 				out.Fatal(err)
@@ -110,37 +131,38 @@ Inertia commands.`,
 			out.Printf("creating new remote '%s'\n", args[0])
 			var highlight = out.NewColorer(out.CY)
 			if addr == "" {
-				addr, err = input.Prompt(highlight.S(":globe_with_meridians: Enter IP address of remote:"))
+				addr, err = input.NewPrompt(nil).
+					Prompt(highlight.S(":globe_with_meridians: Enter IP address of remote:")).
+					GetString()
 				if err != nil {
 					out.Fatal(err)
-				}
-				if addr == "" {
-					out.Fatal("invalid IP address provided")
 				}
 			}
 
 			if keyPath == "" {
-				if resp, err := input.Prompt(
-					highlight.Sf(":key: Enter path to identity file (leave blank to use '%s'):", defaultKey),
-				); err == nil && resp != "" {
+				resp, err := input.NewPrompt(&input.PromptConfig{AllowEmpty: true}).
+					Prompt(highlight.Sf(":key: Enter path to identity file (leave blank to use '%s'):", defaultKey)).
+					GetString()
+				if err == nil && resp != "" {
 					keyPath = resp
 				} else {
 					keyPath = defaultKey
 				}
 			}
 			if user == "" {
-				user, err = input.Prompt(highlight.Sf(":dancer: Enter user for the identity file:"))
+				user, err = input.NewPrompt(nil).
+					Prompt(highlight.Sf(":dancer: Enter user for the identity file:")).
+					GetString()
 				if err != nil {
 					out.Fatal(err)
-				}
-				if user == "" {
-					out.Fatal("invalid user provided")
 				}
 			}
 
 			var webhookSecret string
 			if !genWebhookSecret {
-				secret, err := input.Prompt(highlight.Sf(":secret: Enter a webhook secret (leave blank to generate one):"))
+				secret, err := input.NewPrompt(&input.PromptConfig{AllowEmpty: true}).
+					Prompt(highlight.Sf(":secret: Enter a webhook secret (leave blank to generate one):")).
+					GetString()
 				if err == nil && secret != "" {
 					webhookSecret = secret
 				} else {
@@ -190,6 +212,99 @@ Inertia commands.`,
 	root.AddCommand(addRemote)
 }
 
+func (root *RemoteCmd) attachLoginCmd() {
+	const (
+		flagIP         = "ip"
+		flagTotp       = "totp"
+		flagDaemonPort = "daemon.port"
+	)
+	var loginCmd = &cobra.Command{
+		Use:     "login [remote] [user]",
+		Short:   "Log in to a remote as an existing user.",
+		Long:    `Log in as an existing user to access a remote.`,
+		Example: "inertia remote login staging my_user --ip 1.2.3.4",
+		Args:    cobra.ExactArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			var (
+				remoteName = args[0]
+				username   = args[1]
+				addr, _    = cmd.Flags().GetString(flagIP)
+				port, _    = cmd.Flags().GetString(flagDaemonPort)
+			)
+
+			// check that remote name is valid
+			if err := root.validateRemoteName(remoteName); err != nil {
+				out.Fatal(err.Error())
+			}
+
+			// init remote
+			remoteCfg := &cfg.Remote{
+				Name:     remoteName,
+				Version:  root.Version,
+				IP:       addr,
+				Daemon:   &cfg.Daemon{Port: port},
+				Profiles: make(map[string]string),
+			}
+
+			// prompt for password
+			out.Print("Password: ")
+			pwBytes, err := terminal.ReadPassword(int(syscall.Stdin))
+			out.Println()
+			if err != nil {
+				out.Fatal(err.Error())
+			}
+
+			// set up client
+			var c = client.
+				NewClient(remoteCfg, client.Options{Out: os.Stdout}).
+				GetUserClient()
+			ctx, cancel := context.WithCancel(context.Background())
+			input.CatchSigterm(cancel)
+
+			// authenticate
+			var totp, _ = cmd.Flags().GetString(flagTotp)
+			var req = client.AuthenticateRequest{
+				User:     username,
+				Password: string(pwBytes),
+				TOTP:     totp,
+			}
+			token, err := c.Authenticate(ctx, req)
+			if err != nil && err != client.ErrNeedTotp {
+				out.Fatal(err)
+			}
+			if err == client.ErrNeedTotp {
+				// a TOTP is required
+				out.Print("Authentication code (or backup code): ")
+				totpBytes, err := terminal.ReadPassword(int(syscall.Stdin))
+				out.Println()
+				if err != nil {
+					out.Fatal(err)
+				}
+				// retry with TOTP
+				req.TOTP = string(totpBytes)
+				token, err = c.Authenticate(ctx, req)
+				if err != nil {
+					out.Fatal(err)
+				}
+			}
+
+			// init token and save remote
+			remoteCfg.Daemon.Token = token
+			if err := local.SaveRemote(remoteCfg); err != nil {
+				out.Fatal(err)
+			}
+			out.Printf(":rocket: Successfully logged in to remote '%s' (%s) as user '%s'!",
+				remoteName, addr, username)
+			out.Printf("Try running 'inertia %s status' to check on your remote.", remoteName)
+		},
+	}
+	loginCmd.Flags().String(flagIP, "", "IP address of remote")
+	loginCmd.Flags().String(flagTotp, "", "auth code or backup code for 2FA")
+	loginCmd.Flags().String(flagDaemonPort, "4303", "remote daemon port")
+
+	root.AddCommand(loginCmd)
+}
+
 func (root *RemoteCmd) attachListCmd() {
 	const flagVerbose = "verbose"
 	var list = &cobra.Command{
@@ -198,7 +313,7 @@ func (root *RemoteCmd) attachListCmd() {
 		Long:  `Lists all currently configured remotes.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			var verbose, _ = cmd.Flags().GetBool(flagVerbose)
-			for _, remote := range root.config.Remotes {
+			for _, remote := range root.remotes.Remotes {
 				if verbose {
 					out.Print(out.C("remote '%s'\n", out.BO, out.CY).With(remote.Name))
 					out.Println(out.FormatRemoteDetails(*remote))
@@ -241,7 +356,7 @@ func (root *RemoteCmd) attachShowCmd() {
 		Example: "inertia remote show staging",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			remote, found := root.config.GetRemote(args[0])
+			remote, found := root.remotes.GetRemote(args[0])
 			if found {
 				out.Print(out.C("remote '%s'\n", out.BO, out.CY).With(remote.Name))
 				out.Println(out.FormatRemoteDetails(*remote))
@@ -279,7 +394,7 @@ func (root *RemoteCmd) attachUpgradeCmd() {
 			var remotes = args
 			if all {
 				out.Printf("updating configuration to version '%s' for all remotes\n", version)
-				for _, r := range root.config.Remotes {
+				for _, r := range root.remotes.Remotes {
 					r.Version = version
 					if err := local.SaveRemote(r); err != nil {
 						out.Fatalf("could not update remote '%s': %s", r.Name, err.Error())
@@ -291,7 +406,7 @@ func (root *RemoteCmd) attachUpgradeCmd() {
 				out.Printf("setting configuration to version '%s' for remotes %s\n",
 					version, strings.Join(remotes, ", "))
 				for _, n := range remotes {
-					if r, ok := root.config.GetRemote(n); ok {
+					if r, ok := root.remotes.GetRemote(n); ok {
 						r.Version = version
 						if err := local.SaveRemote(r); err != nil {
 							out.Fatalf("could not update remote '%s': %s", n, err.Error())
@@ -317,7 +432,7 @@ func (root *RemoteCmd) attachSetCmd() {
 		Long:  `Updates the given property of the given remote's configuration.`,
 		Args:  cobra.ExactArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
-			remote, found := root.config.GetRemote(args[0])
+			remote, found := root.remotes.GetRemote(args[0])
 			if found {
 				if err := cfg.SetProperty(args[1], args[2], remote); err == nil {
 					if err := local.SaveRemote(remote); err != nil {
@@ -333,4 +448,45 @@ func (root *RemoteCmd) attachSetCmd() {
 		},
 	}
 	root.AddCommand(set)
+}
+
+func (root *RemoteCmd) attachResetCmd() {
+	var resetCmd = &cobra.Command{
+		Use:   "reset",
+		Short: "Reset all remotes",
+		Long: `Removes all inertia remotes configuration - use 'inertia remote config-path'
+to see where the file is directly. Note that the configuration directory can be set using
+INERTIA_PATH.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			should, err := input.NewPrompt(nil).
+				Prompt("Would you like to reset ALL remote configuration? (y/N)").
+				GetBool()
+			if err != nil {
+				out.Fatal(err)
+			}
+			if should {
+				if err := os.Remove(local.InertiaRemotesPath()); err != nil {
+					out.Fatal(err)
+				} else {
+					println("remote configuration successfully removed")
+				}
+			} else {
+				out.Fatal("aborting")
+			}
+		},
+	}
+	root.AddCommand(resetCmd)
+}
+
+func (root *RemoteCmd) attachConfigPathCmd() {
+	var cfgPath = &cobra.Command{
+		Use:   "config-path",
+		Short: "Output path to remote configuration file",
+		Long: `Outputs where remotes are stored. Note that the configuration directory
+can be set using INERTIA_PATH.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			out.Println(local.InertiaRemotesPath())
+		},
+	}
+	root.AddCommand(cfgPath)
 }

@@ -1,6 +1,6 @@
 # Client
 
-[![GoDoc](https://godoc.org/github.com/ubclaunchpad/inertia?status.svg)](https://godoc.org/github.com/ubclaunchpad/inertia/client)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/ubclaunchpad/inertia)](https://pkg.go.dev/github.com/ubclaunchpad/inertia/client)
 
 This package contains Inertia's clientside interface to remote Inertia daemons. It can be imported for use if you don't like the CLI - for example:
 
@@ -19,7 +19,7 @@ func main() {
 	// set up a client to your remote
 	var inertia = client.NewClient(
 		&cfg.Remote{
-			Version: "v0.5.2",
+			Version: "v0.6.0",
 			Name:    "gcloud",
 			IP:      "my.host.addr",
 			/* ... */

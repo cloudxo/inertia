@@ -13,14 +13,16 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	docker "github.com/docker/docker/client"
+	gogit "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+
 	"github.com/ubclaunchpad/inertia/api"
 	"github.com/ubclaunchpad/inertia/common"
 	"github.com/ubclaunchpad/inertia/daemon/inertiad/build"
 	"github.com/ubclaunchpad/inertia/daemon/inertiad/containers"
 	"github.com/ubclaunchpad/inertia/daemon/inertiad/crypto"
 	"github.com/ubclaunchpad/inertia/daemon/inertiad/git"
-	gogit "gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing/transport/ssh"
+	"github.com/ubclaunchpad/inertia/daemon/inertiad/notify"
 )
 
 // Deployer manages the deployed user project
@@ -45,13 +47,15 @@ type Deployer interface {
 
 // Deployment represents the deployed project
 type Deployment struct {
-	active    bool
-	directory string
+	active           bool
+	directory        string
+	persistDirectory string
 
-	project       string
-	branch        string
-	buildType     string
-	buildFilePath string
+	project                string
+	branch                 string
+	buildType              string
+	buildFilePath          string
+	intermediaryContainers []string
 
 	builder build.ContainerBuilder
 
@@ -60,16 +64,22 @@ type Deployment struct {
 	mux  sync.Mutex
 
 	dataManager *DeploymentDataManager
+
+	notifiers notify.Notifiers
 }
 
 // DeploymentConfig is used to configure Deployment
 type DeploymentConfig struct {
-	ProjectName   string
-	BuildType     string
-	BuildFilePath string
-	RemoteURL     string
-	Branch        string
-	PemFilePath   string
+	ProjectName            string
+	BuildType              string
+	BuildFilePath          string
+	RemoteURL              string
+	Branch                 string
+	PemFilePath            string
+	IntermediaryContainers []string
+
+	// TODO: maybe improve format for generic notifiers
+	SlackNotificationURL string
 }
 
 // DeploymentMetadata is used to store metadata relevant
@@ -84,8 +94,11 @@ type DeploymentMetadata struct {
 // NewDeployment creates a new deployment
 func NewDeployment(
 	projectDirectory string,
+	persistDirectory string,
+
 	databasePath string,
 	databaseKeyPath string,
+
 	builder build.ContainerBuilder,
 ) (*Deployment, error) {
 
@@ -97,9 +110,10 @@ func NewDeployment(
 
 	// Create deployment
 	return &Deployment{
-		directory:   projectDirectory,
-		builder:     builder,
-		dataManager: manager,
+		directory:        projectDirectory,
+		persistDirectory: persistDirectory,
+		builder:          builder,
+		dataManager:      manager,
 	}, nil
 }
 
@@ -124,6 +138,11 @@ func (d *Deployment) Initialize(cfg DeploymentConfig, out io.Writer) error {
 	// Remove existing git repo if there is one
 	os.RemoveAll(filepath.Join(d.directory, ".git"))
 
+	// Remove existing /persist data
+	if d.persistDirectory != "" {
+		os.RemoveAll(d.persistDirectory)
+	}
+
 	// Initialize repository
 	d.repo, err = git.InitializeRepository(cfg.RemoteURL, git.RepoOptions{
 		Directory: d.directory,
@@ -147,6 +166,18 @@ func (d *Deployment) SetConfig(cfg DeploymentConfig) {
 	}
 	if cfg.BuildFilePath != "" {
 		d.buildFilePath = cfg.BuildFilePath
+	}
+	d.intermediaryContainers = cfg.IntermediaryContainers
+
+	// register notifiers
+	if len(d.notifiers) == 0 {
+		d.notifiers = notify.Notifiers{}
+	}
+	if cfg.SlackNotificationURL != "" {
+		nt := notify.NewSlackNotifier(cfg.SlackNotificationURL)
+		if !d.notifiers.Exists(nt) {
+			d.notifiers = append(d.notifiers, nt)
+		}
 	}
 }
 
@@ -196,7 +227,19 @@ func (d *Deployment) Deploy(
 	// Build project
 	deploy, err := d.builder.Build(strings.ToLower(d.buildType), *conf, cli, out)
 	if err != nil {
+		if notifyErr := d.notifiers.Notify(fmt.Sprintf("Build error: %s", err), notify.Options{
+			Color: notify.Red,
+		}); notifyErr != nil {
+			fmt.Fprintln(out, notifyErr.Error())
+		}
 		return func() error { return nil }, err
+	}
+
+	// Send build complete slack notification
+	if notifyErr := d.notifiers.Notify("Build completed", notify.Options{
+		Color: notify.Green,
+	}); notifyErr != nil {
+		fmt.Fprintln(out, notifyErr.Error())
 	}
 
 	// Deploy
@@ -390,9 +433,10 @@ func (d *Deployment) GetDataManager() (manager *DeploymentDataManager, found boo
 // config without env values if error.
 func (d *Deployment) GetBuildConfiguration() (*build.Config, error) {
 	conf := &build.Config{
-		Name:           d.project,
-		BuildFilePath:  d.buildFilePath,
-		BuildDirectory: d.directory,
+		Name:             d.project,
+		BuildFilePath:    d.buildFilePath,
+		BuildDirectory:   d.directory,
+		PersistDirectory: d.persistDirectory,
 	}
 	if d.dataManager != nil {
 		env, err := d.dataManager.GetEnvVariables(true)
@@ -433,23 +477,39 @@ func (d *Deployment) Watch(client *docker.Client) (<-chan string, <-chan error) 
 				}
 
 			case status := <-eventsCh:
+				var containerName string
 				if status.Actor.Attributes != nil {
-					logsCh <- fmt.Sprintf("container %s (%s) has stopped", status.Actor.Attributes["name"], status.ID[:11])
+					containerName = status.Actor.Attributes["name"]
+				}
+
+				if containerName != "" {
+					logsCh <- fmt.Sprintf("container %s (%s) has stopped", containerName, status.ID[:11])
 				} else {
 					logsCh <- fmt.Sprintf("container %s has stopped", status.ID[:11])
 				}
 
 				if d.active {
+					// Check if we should ignore this container's death
+					var ignore bool
+					if len(d.intermediaryContainers) > 0 && containerName == "" {
+						for _, c := range d.intermediaryContainers {
+							if containerName == c {
+								ignore = true
+							}
+						}
+					}
+
 					// Shut down all containers if one stops while project is active
-					d.active = false
-					logsCh <- "container stoppage was unexpected, project is active"
-					err := containers.StopActiveContainers(client, os.Stdout)
-					if err != nil {
-						logsCh <- ("error shutting down other active containers: " + err.Error())
+					if !ignore {
+						d.active = false
+						logsCh <- "container stoppage was unexpected, project is active"
+						err := containers.StopActiveContainers(client, os.Stdout)
+						if err != nil {
+							logsCh <- ("error shutting down other active containers: " + err.Error())
+						}
 					}
 				}
 			}
-
 		}
 	}()
 

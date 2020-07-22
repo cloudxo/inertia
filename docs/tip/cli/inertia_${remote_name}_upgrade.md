@@ -4,7 +4,10 @@ Upgrade Inertia daemon to match the CLI.
 
 ### Synopsis
 
-Restarts the Inertia daemon to upgrade it to the same version as your CLI
+Restarts the Inertia daemon to upgrade it to the same version as your CLI.
+
+To upgrade your remote, you must upgrade your CLI first to the correct version - drop by
+https://github.com/ubclaunchpad/inertia/releases/latest for more details.
 
 ```
 inertia ${remote_name} upgrade [flags]
@@ -20,7 +23,7 @@ inertia ${remote_name} upgrade [flags]
 ### Options inherited from parent commands
 
 ```
-      --config string   specify relative path to Inertia configuration (default "inertia.toml")
+      --config string   specify relative path to Inertia project configuration (default "inertia.toml")
       --debug           enable debug output from Inertia client
   -s, --short           don't stream output from command
       --simple          disable colour and emoji output

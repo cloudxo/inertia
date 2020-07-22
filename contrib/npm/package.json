@@ -1,7 +1,7 @@
 {
-  "name": "inertia-cli",
-  "version": "0.5.3",
-  "description": "Inertia-CLI",
+  "name": "@ubclaunchpad/inertia",
+  "version": "0.6.0",
+  "description": "✈️ Effortless, self-hosted continuous deployment for small teams and projects ",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "node ./src/install.js",
@@ -13,17 +13,18 @@
     "url": "git+https://github.com/ubclaunchpad/inertia.git"
   },
   "keywords": [
-    "ubc-launchpad",
-    "launchpad",
+    "ubc",
+    "launch-pad",
+    "inertia-cli",
     "inertia",
-    "inertia-cli"
+    "cli"
   ],
   "author": "UBC Launch Pad",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/ubclaunchpad/inertia/issues"
   },
-  "homepage": "https://github.com/ubclaunchpad/inertia#readme",
+  "homepage": "https://inertia.ubclaunchpad.com",
   "dependencies": {
     "fs-extra": "^7.0.1",
     "mkdirp": "^0.5.1",

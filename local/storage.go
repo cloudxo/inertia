@@ -12,7 +12,7 @@ import (
 	"github.com/ubclaunchpad/inertia/cfg"
 )
 
-const inertiaGlobalName = "inertia.global"
+const inertiaRemotesFile = "inertia.remotes"
 
 // InertiaDir gets the path to the directory where global Inertia configuration
 // is stored
@@ -20,54 +20,54 @@ func InertiaDir() string {
 	if os.Getenv("INERTIA_PATH") != "" {
 		return os.Getenv("INERTIA_PATH")
 	}
-	home, err := os.UserHomeDir()
+	confDir, err := os.UserConfigDir()
 	if err != nil {
-		return "/.inertia"
+		return "/inertia"
 	}
-	return filepath.Join(home, ".inertia")
+	return filepath.Join(confDir, "inertia")
 }
 
-// InertiaConfigPath gets the path to global Inertia configuration
-func InertiaConfigPath() string { return filepath.Join(InertiaDir(), inertiaGlobalName) }
+// InertiaRemotesPath gets the path to global Inertia configuration
+func InertiaRemotesPath() string { return filepath.Join(InertiaDir(), inertiaRemotesFile) }
 
-// GetInertiaConfig retrieves global Inertia configuration
-func GetInertiaConfig() (*cfg.Inertia, error) {
-	raw, err := ioutil.ReadFile(InertiaConfigPath())
+// GetRemotes retrieves global Inertia remotes configuration
+func GetRemotes() (*cfg.Remotes, error) {
+	raw, err := ioutil.ReadFile(InertiaRemotesPath())
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, errors.New("config file doesn't exist")
+			return nil, errors.New("global config file doesn't exist - try running 'inertia init --global'")
 		}
 		return nil, err
 	}
 
-	var inertia cfg.Inertia
-	if err = toml.Unmarshal(raw, &inertia); err != nil {
+	var remotes cfg.Remotes
+	if err = toml.Unmarshal(raw, &remotes); err != nil {
 		return nil, err
 	}
-	return &inertia, nil
+	return &remotes, nil
 }
 
 // SaveRemote adds or updates the given remote in the global Inertia configuration
 // file.
 func SaveRemote(remote *cfg.Remote) error {
-	inertia, err := GetInertiaConfig()
+	remotes, err := GetRemotes()
 	if err != nil {
 		return err
 	}
-	inertia.SetRemote(*remote)
-	return Write(InertiaConfigPath(), inertia)
+	remotes.SetRemote(*remote)
+	return Write(InertiaRemotesPath(), remotes)
 }
 
 // RemoveRemote deletes the named remote from the global Inertia configuration file.
 func RemoveRemote(name string) error {
-	inertia, err := GetInertiaConfig()
+	remotes, err := GetRemotes()
 	if err != nil {
 		return err
 	}
-	if !inertia.RemoveRemote(name) {
+	if !remotes.RemoveRemote(name) {
 		return fmt.Errorf("failed to remove remote '%s'", name)
 	}
-	return Write(InertiaConfigPath(), inertia)
+	return Write(InertiaRemotesPath(), remotes)
 }
 
 // GetProject retrieves the Inertia project configuration at the given path
@@ -75,7 +75,7 @@ func GetProject(path string) (*cfg.Project, error) {
 	raw, err := ioutil.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, errors.New("config file doesn't exist - try running inertia init")
+			return nil, errors.New("project config file doesn't exist - try running 'inertia init'")
 		}
 		return nil, err
 	}
